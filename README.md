@@ -16,13 +16,13 @@
 
 ## Download
 
-* **Latest build:** open the [Actions](../../actions) tab, pick the newest green **Build** run and download **SectorForge-windows-x64**. It contains `SectorForge.exe` plus `vcruntime140.dll`; keep them in the same folder. No installer needed.
+* **Latest build:** [SectorForge-windows-x64.zip](../../releases/download/latest/SectorForge-windows-x64.zip) from the [latest release](../../releases/tag/latest), which every green build on `main` refreshes. The Actions tab also keeps each run as **SectorForge-windows-x64**. It contains `SectorForge.exe` plus `vcruntime140.dll`; keep them in the same folder. No installer needed.
 * **Releases:** pushing a `v*` tag publishes a zip on the Releases page.
 
 Requirements: Windows 10 or 11 (64-bit) and any GPU driver with OpenGL 1.1 or newer, which means every Windows PC.
 
 ### Android
-* **Latest build:** in the newest green **Build** run on the [Actions](../../actions) tab, download **SectorForge-android** and install `SectorForge-android.apk` (allow installs from your browser or file manager when asked). Tagged releases attach the APK as well.
+* **Latest build:** open [SectorForge-android.apk](../../releases/download/latest/SectorForge-android.apk) on your phone and install it (allow installs from your browser when Android asks). It lives on the [latest release](../../releases/tag/latest), which every green build on `main` refreshes after the APK passes an emulator walkthrough.
 * Android 8.0 or newer with OpenGL ES 3.0 (any phone from the last several years). Built for arm64 phones plus x86_64 emulators.
 * Every build is signed with the same key (`android/sectorforge-release.jks`), so a new APK installs over the old one and keeps your projects. That key is public; use your own before publishing to a store.
 * Projects live in `Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects`, which you can reach over USB. The `.sfproj` / `.sfmap` files are the same as on Windows, so projects move between the two.
