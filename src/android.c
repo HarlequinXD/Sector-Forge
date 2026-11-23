@@ -175,14 +175,18 @@ bool plat_font_raster(const char *face, float px, int weight, const uint32_t *cp
 static bool egl_init_display(void) {
     g_dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
     if (!eglInitialize(g_dpy, NULL, NULL)) return false;
-    EGLint base[] = { EGL_RENDERABLE_TYPE, 0x40 /* EGL_OPENGL_ES3_BIT */, EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-                      EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 0,
-                      EGL_DEPTH_SIZE, 24, EGL_STENCIL_SIZE, 8, EGL_SAMPLE_BUFFERS, 1, EGL_SAMPLES, 4, EGL_NONE };
+    /* best first: 4x MSAA with stencil (the loupe), then no MSAA, then whatever ES3 offers */
+    static const EGLint want[3][4] = { { 24, 8, 1, 4 }, { 24, 8, 0, 0 }, { 16, 0, 0, 0 } };
     EGLint n = 0;
-    if (!eglChooseConfig(g_dpy, base, &g_cfg, 1, &n) || n < 1) {
-        base[18] = 0; base[20] = 0;   /* no MSAA */
-        if (!eglChooseConfig(g_dpy, base, &g_cfg, 1, &n) || n < 1) return false;
+    for (int i = 0; i < 3 && n < 1; i++) {
+        EGLint at[] = { EGL_RENDERABLE_TYPE, 0x40 /* EGL_OPENGL_ES3_BIT */, EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
+                        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8,
+                        EGL_DEPTH_SIZE, want[i][0], EGL_STENCIL_SIZE, want[i][1],
+                        EGL_SAMPLE_BUFFERS, want[i][2], EGL_SAMPLES, want[i][3], EGL_NONE };
+        if (!eglChooseConfig(g_dpy, at, &g_cfg, 1, &n)) n = 0;
+        if (n > 0) LOGI("EGL config %d (depth %d, stencil %d, samples %d)", i, want[i][0], want[i][1], want[i][3]);
     }
+    if (n < 1) return false;
     EGLint ca[] = { EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE };
     g_ctx = eglCreateContext(g_dpy, g_cfg, EGL_NO_CONTEXT, ca);
     return g_ctx != EGL_NO_CONTEXT;
@@ -408,6 +412,10 @@ static void on_cmd(struct android_app *app, int32_t cmd) {
             read_density();
             in.time = plat_time();
             g_app_ready = app_init();
+            EGLint w = 0, h = 0;
+            eglQuerySurface(g_dpy, g_surf, EGL_WIDTH, &w);
+            eglQuerySurface(g_dpy, g_surf, EGL_HEIGHT, &h);
+            LOGI("app_init %s, surface %dx%d, density %.3f, GL %s", g_app_ready ? "ok" : "FAILED", w, h, g_density, (const char *)glGetString(GL_RENDERER));
         }
         break;
     case APP_CMD_TERM_WINDOW: egl_drop_surface(); break;

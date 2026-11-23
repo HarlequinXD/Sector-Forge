@@ -46,7 +46,7 @@ static struct {
     /* home */
     ProjectList projects;
     int home_tab;
-    float home_scroll, tpl_scroll, learn_scroll, set_scroll;
+    float home_scroll, tpl_scroll, tpls_scroll, learn_scroll, set_scroll;
     char proj_filter[64];
     float *tpl_seg[TPL_COUNT];
     int tpl_nseg[TPL_COUNT];
@@ -933,14 +933,14 @@ static void home_projects(const Input *in, Rect area) {
 
 static void home_templates(const Input *in, Rect area) {
     float W = in->win_w;
-    scroll_area(area, &M.tpl_scroll, 0, false);
+    scroll_area(area, &M.tpls_scroll, 0, false);
     gfx_clip_push(area);
-    float y = area.y + 8 - M.tpl_scroll;
+    float y = area.y + 8 - M.tpls_scroll;
     y = home_header(in, y, "Templates", false);
     gfx_text(FONT_UI, 20, y - 8, "Every new project starts from one of these.", C(MS_ON2));
     y += 24;
     for (int t = 0; t < TPL_COUNT; t++) {
-        Rect c = rect(20, y, W - 40, 236);
+        Rect c = rect(20, y, W - 40, 248);
         gfx_rrect(c, 18, C(MS_SURF));
         gfx_rrect_line(c, 18, 1, C(MS_OUTLINE));
         map_thumb(rect(c.x + 2, c.y + 2, c.w - 4, 124), M.tpl_seg[t], M.tpl_nseg[t], false, 16);
@@ -950,7 +950,7 @@ static void home_templates(const Input *in, Rect area) {
             ask_new_project(t);
         y += c.h + 14;
     }
-    for (int s = 0; s < M.nsreg_next; s++) if (M.sreg_next[s].scroll == &M.tpl_scroll) M.sreg_next[s].content = y + M.tpl_scroll - area.y + 20;
+    for (int s = 0; s < M.nsreg_next; s++) if (M.sreg_next[s].scroll == &M.tpls_scroll) M.sreg_next[s].content = y + M.tpls_scroll - area.y + 20;
     gfx_clip_pop();
 }
 
@@ -2646,6 +2646,38 @@ static void handle_back(void) {
     leave_editor();
 }
 
+/* Bluetooth / DeX keyboards: the common desktop shortcuts */
+static void keyboard_shortcuts(const Input *in) {
+    if (M.bsheet != BS_NONE) return;
+    if (in->ctrl) {
+        if (in->kpressed['Z']) { if (in->shift) ed_redo(); else ed_undo(); }
+        if (in->kpressed['Y']) ed_redo();
+        if (in->kpressed['S']) { if (ed_save()) ed_toast("Saved", 1); }
+        if (ed.mode == MODE_2D) {
+            if (in->kpressed['C']) ed_copy(false);
+            if (in->kpressed['X']) ed_copy(true);
+            if (in->kpressed['V']) ed_paste();
+            if (in->kpressed['D']) ed_duplicate();
+            if (in->kpressed['A']) ed_select_all();
+        }
+        return;
+    }
+    if (in->kpressed[KEY_F5]) { M.paused = false; ed_set_mode(ed.mode == MODE_PLAY ? MODE_2D : MODE_PLAY); }
+    if (ed.mode == MODE_PLAY) return;
+    if (in->kpressed[KEY_TAB]) ed_set_mode(ed.mode == MODE_2D ? MODE_3D : MODE_2D);
+    if (ed.mode == MODE_2D) {
+        if (in->kpressed[KEY_DELETE]) ed_delete();
+        if (in->kpressed[KEY_HOME]) ed_fit_view();
+        if (in->kpressed[KEY_LBRACKET]) ed_grid_step(-1);
+        if (in->kpressed[KEY_RBRACKET]) ed_grid_step(1);
+        if (in->kpressed['S'] && !in->shift) ed_set_tool(T_SELECT);
+        if (in->kpressed['D']) ed_set_tool(T_DRAW);
+        if (in->kpressed['R']) ed_set_tool(T_RECT);
+        if (in->kpressed['L']) ed_set_tool(T_LINES);
+        if (in->kpressed['T']) ed_set_tool(T_THING);
+    }
+}
+
 static void editor_screen(const Input *in) {
     float W = in->win_w, H = in->win_h;
     sel_gather(&g_sel);
@@ -2660,6 +2692,7 @@ static void editor_screen(const Input *in) {
         if (M.sheet_open) vp.w -= sheet_w;
     }
     g_vp = vp;
+    keyboard_shortcuts(in);
     /* the map engine draws first, at the base layer, using the routed input */
     ui.layer = LAYER_BASE;
     Input *v = &M.vin;

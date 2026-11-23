@@ -6,6 +6,8 @@ OUT=shots
 mkdir -p $OUT
 adb shell wm size 1080x2340
 adb shell wm density 420
+sleep 2
+adb shell wm size
 adb install -r SectorForge-android.apk
 adb logcat -c
 adb shell am start -n com.harlequinxd.sectorforge/.MainActivity
