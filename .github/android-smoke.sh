@@ -11,6 +11,8 @@ adb logcat -c
 adb shell am start -n com.harlequinxd.sectorforge/.MainActivity
 sleep 12
 adb exec-out screencap -p > $OUT/01_home.png
+adb shell input tap 858 654                 # dismiss Android's one-time "Viewing full screen" tip
+sleep 2
 adb shell input tap 675 446                 # "Starter Room" template card
 sleep 3
 adb exec-out screencap -p > $OUT/02_name_dialog.png

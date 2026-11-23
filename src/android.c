@@ -432,7 +432,7 @@ static void on_cmd(struct android_app *app, int32_t cmd) {
 
 void android_main(struct android_app *app) {
     g_app = app;
-    g_t0 = posix_now();
+    if (g_t0 == 0) g_t0 = posix_now();   /* keep the clock monotonic across activity relaunches */
     app->onAppCmd = on_cmd;
     app->onInputEvent = on_input;
     const char *ext = app->activity->externalDataPath, *intl = app->activity->internalDataPath;
