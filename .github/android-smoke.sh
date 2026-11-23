@@ -20,10 +20,10 @@ adb shell input text "Smoke%sTest"
 adb shell input keyevent 66
 sleep 10
 adb exec-out screencap -p > $OUT/03_guide.png
-adb shell input tap 157 84                  # close the first-run guide
+adb shell input keyevent 4                  # close the first-run guide (back)
 sleep 2
 adb exec-out screencap -p > $OUT/04_editor_2d.png
-adb shell input tap 131 302                 # Draw tool
+adb shell input tap 215 302                 # Draw tool (rail sits right of the camera cutout)
 sleep 1
 adb shell input tap 1575 394
 adb shell input tap 1838 394
