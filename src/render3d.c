@@ -2,6 +2,7 @@
 #include "render3d.h"
 #include "assets.h"
 #include "glinc.h"
+#include "tess.h"
 
 /* ------------------------------------------------------------------ triangulation cache (GLU tessellator) */
 static struct {
@@ -13,6 +14,7 @@ static struct {
     bool valid;
 } g_cache;
 
+#ifdef SF_USE_GLU
 static FloatArr *g_tess_out;
 static ARR(double *) g_tess_alloc;
 
@@ -32,6 +34,8 @@ static void CALLBACK tess_combine(GLdouble coords[3], void *vd[4], GLfloat w[4],
 }
 static void CALLBACK tess_error(GLenum e) { (void)e; }
 
+#endif
+
 void r3d_invalidate(void) { g_cache.valid = false; }
 
 static void build_cache(const Map *m) {
@@ -41,6 +45,7 @@ static void build_cache(const Map *m) {
     g_cache.nsec = m->sectors.n;
     g_cache.start = calloc((size_t)(m->sectors.n + 1), sizeof(int));
     g_cache.count = calloc((size_t)(m->sectors.n + 1), sizeof(int));
+#ifdef SF_USE_GLU
     GLUtesselator *t = gluNewTess();
     gluTessCallback(t, GLU_TESS_BEGIN, (void (CALLBACK *)())tess_begin);
     gluTessCallback(t, GLU_TESS_EDGE_FLAG, (void (CALLBACK *)())tess_edge);
@@ -49,9 +54,10 @@ static void build_cache(const Map *m) {
     gluTessCallback(t, GLU_TESS_ERROR, (void (CALLBACK *)())tess_error);
     gluTessProperty(t, GLU_TESS_WINDING_RULE, GLU_TESS_WINDING_ODD);
     gluTessNormal(t, 0, 0, 1);
+    g_tess_out = &g_cache.tris;
+#endif
     IntArr vs = { 0 }, ls = { 0 };
     ARR(double) coords = { 0 };
-    g_tess_out = &g_cache.tris;
     for (int s = 0; s < m->sectors.n; s++) {
         map_sector_loops(m, s, &vs, &ls);
         g_cache.start[s] = g_cache.tris.n;
@@ -64,6 +70,7 @@ static void build_cache(const Map *m) {
                 coords.a[i * 3 + 2] = 0;
             }
             coords.n = vs.n * 3;
+#ifdef SF_USE_GLU
             gluTessBeginPolygon(t, NULL);
             for (int L = 0; L + 1 < ls.n; L++) {
                 if (ls.a[L + 1] - ls.a[L] < 3) continue;
@@ -74,10 +81,18 @@ static void build_cache(const Map *m) {
             gluTessEndPolygon(t);
             for (int i = 0; i < g_tess_alloc.n; i++) free(g_tess_alloc.a[i]);
             arr_clear(g_tess_alloc);
+#else
+            double *xy = malloc(sizeof(double) * 2 * (size_t)vs.n);
+            for (int i = 0; i < vs.n; i++) { xy[i * 2] = coords.a[i * 3]; xy[i * 2 + 1] = coords.a[i * 3 + 1]; }
+            tess_odd(xy, ls.a, ls.n - 1, &g_cache.tris);
+            free(xy);
+#endif
         }
         g_cache.count[s] = (g_cache.tris.n - g_cache.start[s]) / 6;
     }
+#ifdef SF_USE_GLU
     gluDeleteTess(t);
+#endif
     arr_free(vs); arr_free(ls); arr_free(coords);
     g_cache.map = m;
     g_cache.rev = m->geo_rev;
@@ -428,6 +443,9 @@ uint32_t r3d_pick(const Map *m, const Cam3 *c, Rect vp, float scale, float win_h
     if (!rect_has(vp, mx, my)) return 0;
     ensure_cache(m);
     int px = (int)(mx * scale), py = (int)((win_h - my) * scale);
+#ifdef SF_GLES
+    sfgl_offscreen(true);   /* the window surface is multisampled; pick on a single-sample target */
+#endif
     setup_view(c, vp, scale, win_h);
     glEnable(GL_SCISSOR_TEST);
     glScissor(px, py, 1, 1);
@@ -456,6 +474,9 @@ uint32_t r3d_pick(const Map *m, const Cam3 *c, Rect vp, float scale, float win_h
     glDepthFunc(GL_LEQUAL);
     GLubyte px3[4] = { 0 };
     glReadPixels(px, py, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px3);
+#ifdef SF_GLES
+    sfgl_offscreen(false);
+#endif
     glEnable(GL_DITHER);
     glEnable(SF_GL_MULTISAMPLE);
     glDisable(GL_SCISSOR_TEST);

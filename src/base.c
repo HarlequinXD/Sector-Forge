@@ -90,7 +90,11 @@ const char *sf_basename(const char *path) {
 void sf_path_join(char *out, size_t cap, const char *a, const char *b) {
     size_t la = strlen(a);
     if (la && (a[la - 1] == '/' || a[la - 1] == '\\')) snprintf(out, cap, "%s%s", a, b);
+#ifdef _WIN32
     else snprintf(out, cap, "%s\\%s", a, b);
+#else
+    else snprintf(out, cap, "%s/%s", a, b);
+#endif
 }
 
 void sf_strip_ext(char *s) {

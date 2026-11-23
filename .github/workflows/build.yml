@@ -60,6 +60,72 @@ jobs:
         with:
           files: SectorForge-windows-x64.zip
 
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Use the runner's NDK
+        run: |
+          echo "SF_NDK_VERSION=$(basename "$ANDROID_NDK_LATEST_HOME")" >> "$GITHUB_ENV"
+          echo "SF_VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          set +e
+          gradle assembleRelease --no-daemon --console=plain > build.log 2>&1
+          status=$?
+          tail -n 60 build.log
+          if [ $status -ne 0 ]; then
+            grep -E '(error|Error|ERROR)[: ]' build.log | grep -v 'warning' | head -n 40 | while IFS= read -r line; do echo "::error title=android::$line"; done
+            exit $status
+          fi
+          cp app/build/outputs/apk/release/app-release.apk ../SectorForge-android.apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: SectorForge-android
+          path: SectorForge-android.apk
+
+      - name: Publish release (tags only)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: SectorForge-android.apk
+
+  mobile-tests:
+    name: Touch shell tests (Linux, Mesa GLES)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Mesa GLES, fonts and Pillow
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libegl-dev libgles-dev libegl-mesa0 libgl1-mesa-dri fonts-inter fonts-dejavu-core python3-pil > /dev/null
+      - name: Build and run
+        env:
+          SF_GL_INC: ' '
+          SF_SHOTS: '1'
+        run: sh tests/run_mobile.sh
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-screenshots
+          path: /tmp/mshots/*.png
+
   core-tests:
     name: Map core tests (Linux)
     runs-on: ubuntu-latest

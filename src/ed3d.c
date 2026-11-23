@@ -89,6 +89,14 @@ static void sector_of_surface(uint32_t id, int *out_s) {
     else if (k >= SURF_UPPER && k <= SURF_LOWER && i / 2 < ed.map.lines.n) *out_s = ed.map.lines.a[i / 2].side[i & 1].sector;
 }
 
+static void wheel_heights(float dir, bool fine);
+static void adjust_light(int d);
+
+void ed3d_adjust(float dir, bool fine) {
+    if (ed.tool3d == T3_LIGHT) adjust_light(dir > 0 ? (fine ? 4 : 16) : (fine ? -4 : -16));
+    else wheel_heights(dir, fine);
+}
+
 static void wheel_heights(float dir, bool fine) {
     Map *m = &ed.map;
     int step = fine ? 1 : SF_MAX(ed.hstep, 1);
@@ -209,8 +217,14 @@ void ed3d_frame(Rect vp, const Input *in) {
         ed.cam.pitch = SF_CLAMP(ed.cam.pitch, -1.55f, 1.55f);
         ui.cursor = CUR_NONE;
     }
+    if (in->vlook_x != 0 || in->vlook_y != 0) {
+        float s = 0.0050f * g_settings.mouse_sens;
+        ed.cam.yaw -= in->vlook_x * s;
+        ed.cam.pitch -= in->vlook_y * s * (g_settings.invert_y ? -1 : 1);
+        ed.cam.pitch = SF_CLAMP(ed.cam.pitch, -1.55f, 1.55f);
+    }
     /* fly */
-    if ((hov || ed.looking) && !ui.text_focus && !in->ctrl) {
+    if ((hov || ed.looking || in->touch) && !ui.text_focus && !in->ctrl) {
         V3 f, r, u;
         r3d_cam_vectors(&ed.cam, &f, &r, &u);
         float sp = (in->shift ? 1500.0f : 520.0f) * (float)in->dt;
@@ -222,7 +236,14 @@ void ed3d_frame(Rect vp, const Input *in) {
         if (in->kdown['E']) mv.z += 1;
         if (in->kdown['Q']) mv.z -= 1;
         float l = v3_len(mv);
-        if (l > 0) { mv = v3_scale(mv, sp / l); ed.cam.x += mv.x; ed.cam.y += mv.y; ed.cam.z += mv.z; }
+        if (l > 0) mv = v3_scale(mv, 1.0f / l);
+        /* analog stick: forward follows the view horizontally so pitch doesn't sink the camera */
+        V3 fh = v3(cosf(ed.cam.yaw), sinf(ed.cam.yaw), 0);
+        mv = v3_add(mv, v3_add(v3_scale(fh, in->vmove_y), v3_scale(r, in->vmove_x)));
+        mv.z += in->vlift;
+        l = v3_len(mv);
+        if (l > 1) mv = v3_scale(mv, 1.0f / l);
+        if (l > 0) { mv = v3_scale(mv, sp); ed.cam.x += mv.x; ed.cam.y += mv.y; ed.cam.z += mv.z; }
         if (ed.looking && in->wheel != 0) { /* wheel while looking adjusts fly speed feel: dolly */
             ed.cam.x += f.x * in->wheel * 64; ed.cam.y += f.y * in->wheel * 64; ed.cam.z += f.z * in->wheel * 64;
         }
@@ -237,7 +258,10 @@ void ed3d_frame(Rect vp, const Input *in) {
     o.nsel = ed.sel3d.n;
     o.time = in->time;
     /* picking */
-    if (hov && !ed.looking) ed.hover3d = r3d_pick(&ed.map, &ed.cam, vp, in->scale, in->win_h, in->mx, in->my, &o);
+    if (in->touch) {
+        if (hov && in->mpressed[0]) ed.hover3d = r3d_pick(&ed.map, &ed.cam, vp, in->scale, in->win_h, in->mx, in->my, &o);
+        else ed.hover3d = 0;
+    } else if (hov && !ed.looking) ed.hover3d = r3d_pick(&ed.map, &ed.cam, vp, in->scale, in->win_h, in->mx, in->my, &o);
     else if (!ed.looking) ed.hover3d = 0;
     o.hover = ed.hover3d;
     /* interaction */
@@ -298,6 +322,7 @@ void ed3d_frame(Rect vp, const Input *in) {
     o.nsel = ed.sel3d.n;
     r3d_draw(&ed.map, &ed.cam, vp, in->scale, in->win_h, &o);
     gfx_begin_2d(in->win_w, in->win_h, in->scale);
+    if (in->touch) return;   /* the touch shell draws its own 3D overlays */
 
     /* overlays */
     float x = vp.x + 12, y = vp.y + 12, w;

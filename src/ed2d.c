@@ -1060,6 +1060,43 @@ void ed2d_frame(Rect vp, const Input *in) {
         for (int i = 0; i < ed.map.things.n; i++) if (ed.map.things.a[i].sel) ed.map.things.a[i].angle = fmodf(ed.map.things.a[i].angle + d + 360, 360);
     }
     render(vp, in);
-    overlays(vp, in);
-    grid_popup(vp, in);
+    if (!in->touch) {   /* the touch shell draws its own chips, hints and grid sheet */
+        overlays(vp, in);
+        grid_popup(vp, in);
+    }
+}
+
+/* ------------------------------------------------------------------ hooks for the touch shell */
+void ed2d_finish_draw(bool closed) { finish_draw(closed); }
+
+bool ed2d_item_at(float sx, float sy) {
+    update_hover(sx, sy);
+    return hovered_item() >= 0;
+}
+
+void ed2d_select_at(float sx, float sy) {
+    update_hover(sx, sy);
+    int it = hovered_item();
+    if (it >= 0 && !*item_sel(it)) { map_select_none(&ed.map); *item_sel(it) = 1; }
+}
+
+void ed2d_zoom_about(float sx, float sy, double factor) {
+    D2 w = ed2d_screen_to_world(sx, sy);
+    double nz = SF_CLAMP(ed.zoom * factor, 0.01, 32.0);
+    ed.vx = w.x - (sx - ed.view.x - ed.view.w * 0.5) / nz;
+    ed.vy = w.y + (sy - ed.view.y - ed.view.h * 0.5) / nz;
+    ed.zoom = nz;
+}
+
+void ed2d_pan_px(float dx, float dy) {
+    ed.vx -= dx / ed.zoom;
+    ed.vy += dy / ed.zoom;
+}
+
+void ed2d_render_view(Rect vp, const Input *in, double cx, double cy, double zoom) {
+    Rect sv = ed.view;
+    double svx = ed.vx, svy = ed.vy, sz = ed.zoom;
+    ed.view = vp; ed.vx = cx; ed.vy = cy; ed.zoom = zoom;
+    render(vp, in);
+    ed.view = sv; ed.vx = svx; ed.vy = svy; ed.zoom = sz;
 }

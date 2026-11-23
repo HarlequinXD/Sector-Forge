@@ -1,0 +1,66 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.harlequinxd.sectorforge'
+    compileSdk 35
+    // CI passes the NDK that is installed on the runner; locally the newest one in the SDK is used
+    if (System.getenv("SF_NDK_VERSION")) ndkVersion System.getenv("SF_NDK_VERSION")
+
+    defaultConfig {
+        applicationId 'com.harlequinxd.sectorforge'
+        minSdk 26
+        targetSdk 35
+        versionCode Integer.parseInt(System.getenv("SF_VERSION_CODE") ?: "1")
+        versionName '0.1.0'
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
+        externalNativeBuild {
+            cmake {
+                arguments '-DANDROID_STL=none'
+                cFlags '-O2'
+            }
+        }
+    }
+
+    signingConfigs {
+        // A fixed key so every build installs over the previous one. It is public (committed to the repo),
+        // which is fine for testing; use your own private key before publishing to a store.
+        release {
+            storeFile file('../sectorforge-release.jks')
+            storePassword 'sectorforge'
+            keyAlias 'sectorforge'
+            keyPassword 'sectorforge'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.release
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path 'CMakeLists.txt'
+            version '3.22.1'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging false
+        }
+    }
+}

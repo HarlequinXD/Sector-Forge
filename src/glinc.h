@@ -1,6 +1,10 @@
-/* OpenGL includes (Windows ships GL 1.1 + GLU; everything here sticks to that API) */
+/* OpenGL includes. The renderer targets the GL 1.1 + GLU API that Windows ships;
+   on OpenGL ES (Android) gles_compat.h emulates that subset. */
 #ifndef SF_GLINC_H
 #define SF_GLINC_H
+#if defined(SF_GLES)
+#include "gles_compat.h"
+#else
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
 #endif
@@ -10,6 +14,10 @@
 #include <windows.h>
 #include <GL/gl.h>
 #include <GL/glu.h>
+#if defined(_WIN32)
+#define SF_USE_GLU
+#endif
+#endif
 #ifndef GL_CLAMP_TO_EDGE
 #define GL_CLAMP_TO_EDGE 0x812F
 #endif

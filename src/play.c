@@ -311,12 +311,12 @@ void play_frame(Rect vp, const Input *in) {
     /* look */
     float s = 0.0022f * g_settings.mouse_sens;
     if (alive) {
-        P->yaw -= in->mdx * s;
-        P->pitch -= in->mdy * s * (g_settings.invert_y ? -1 : 1);
+        P->yaw -= in->mdx * s + in->vlook_x * 0.0050f * g_settings.mouse_sens;
+        P->pitch -= (in->mdy * s + in->vlook_y * 0.0050f * g_settings.mouse_sens) * (g_settings.invert_y ? -1 : 1);
         P->pitch = SF_CLAMP(P->pitch, -1.35f, 1.35f);
     }
     /* move */
-    P->crouch = alive && in->kdown[KEY_CTRL];
+    P->crouch = alive && (in->kdown[KEY_CTRL] || in->vcrouch);
     float height = P->crouch ? P_CROUCH : P_HEIGHT;
     float target_eye = height * P_EYE;
     P->eye += (target_eye - P->eye) * SF_MIN(1.0f, dt * 12);
@@ -329,8 +329,15 @@ void play_frame(Rect vp, const Input *in) {
         if (in->kdown['A']) { wx -= rx; wy -= ry; }
     }
     float wl = sqrtf(wx * wx + wy * wy);
-    float speed = (in->kdown[KEY_SHIFT] ? 420.0f : 260.0f) * (P->crouch ? 0.5f : 1.0f);
-    if (wl > 0) { wx = wx / wl * speed * dt; wy = wy / wl * speed * dt; }
+    if (wl > 0) { wx /= wl; wy /= wl; }
+    if (alive) {   /* analog stick */
+        wx += fx * in->vmove_y + rx * in->vmove_x;
+        wy += fy * in->vmove_y + ry * in->vmove_x;
+    }
+    wl = sqrtf(wx * wx + wy * wy);
+    if (wl > 1) { wx /= wl; wy /= wl; }
+    float speed = (in->kdown[KEY_SHIFT] || (in->touch && wl > 0.92f) ? 420.0f : 260.0f) * (P->crouch ? 0.5f : 1.0f);
+    if (wl > 0.02f) { wx *= speed * dt; wy *= speed * dt; } else { wx = wy = 0; wl = 0; }
     int steps = (int)(sqrtf(wx * wx + wy * wy) / 6) + 1;
     for (int i = 0; i < steps; i++) {
         float nx = P->x + wx / steps, ny = P->y + wy / steps;
@@ -350,13 +357,13 @@ void play_frame(Rect vp, const Input *in) {
         P->on_ground = true;
     }
     if (P->z + height > cz && cz > fz) { P->z = SF_MAX(fz, cz - height); if (P->vz > 0) P->vz = 0; }
-    if (alive && P->on_ground && in->kpressed[KEY_SPACE]) { P->vz = JUMP_V; P->on_ground = false; }
+    if (alive && P->on_ground && (in->kpressed[KEY_SPACE] || in->vjump)) { P->vz = JUMP_V; P->on_ground = false; }
     /* bob */
     if (wl > 0 && P->on_ground) P->bob_t += dt * (speed / 30.0f);
     P->bob = (wl > 0 && P->on_ground) ? sinf(P->bob_t) * 3.0f : P->bob * 0.85f;
     /* actions */
-    if (alive && (in->kpressed['E'] || in->kpressed[KEY_ENTER])) use_line();
-    if (alive && (in->mpressed[0] || (in->mdown[0] && in->time - P->fire_time > 0.32))) fire();
+    if (alive && (in->kpressed['E'] || in->kpressed[KEY_ENTER] || in->vuse)) use_line();
+    if (alive && (in->mpressed[0] || ((in->mdown[0] || in->vfire) && in->time - P->fire_time > 0.32))) fire();
     update_specials(dt, psec);
     if (alive) pickups();
     if (psec >= 0 && alive) {
@@ -404,8 +411,8 @@ void play_frame(Rect vp, const Input *in) {
     /* flashes */
     if (P->hurt_flash > 0) gfx_rect(vp, col(255, 40, 30, (int)(90 * P->hurt_flash)));
     if (P->pickup_flash > 0) gfx_rect(vp, col(255, 220, 120, (int)(50 * P->pickup_flash)));
-    /* banner */
-    {
+    /* banner (desktop only: the touch shell has a pause button instead) */
+    if (!in->touch) {
         const char *t1 = "PLAY MODE";
         char t2[96];
         snprintf(t2, sizeof t2, "%s", m->name);
@@ -424,7 +431,7 @@ void play_frame(Rect vp, const Input *in) {
         char f[48];
         snprintf(f, sizeof f, "%.0f fps", ed.fps);
         float w;
-        ui_chip(vp.x + vp.w - 90, vp.y + 18, -1, f, false, &w);
+        ui_chip(vp.x + vp.w - 90, vp.y + (in->touch ? vp.h - 40 : 18), -1, f, false, &w);
     }
     /* HUD */
     char hb[16], ab[16], mb[16], sb[16];
@@ -432,12 +439,19 @@ void play_frame(Rect vp, const Input *in) {
     snprintf(ab, sizeof ab, "%d", (int)P->armor);
     snprintf(mb, sizeof mb, "%d", P->ammo);
     snprintf(sb, sizeof sb, "/ 200");
-    hud_box(vp.x + 16, vp.y + vp.h - 16, "HEALTH", hb, NULL, P->health > 30 ? TH_GREEN : TH_RED, false);
-    hud_box(vp.x + 16 + 130, vp.y + vp.h - 16, "ARMOR", ab, NULL, TH_BLUE, false);
-    hud_box(vp.x + vp.w - 16, vp.y + vp.h - 16, "AMMO", mb, sb, TH_ACCENT_HI, true);
+    if (in->touch) {   /* thumbs live at the bottom on a phone, so the HUD moves to the top */
+        float hx = vp.x + in->inset_l + 84, hy = vp.y + in->inset_t + 14 + 64;
+        hud_box(hx, hy, "HEALTH", hb, NULL, P->health > 30 ? TH_GREEN : TH_RED, false);
+        hud_box(hx + 116, hy, "ARMOR", ab, NULL, TH_BLUE, false);
+        hud_box(vp.x + vp.w - in->inset_r - 16, hy, "AMMO", mb, sb, TH_ACCENT_HI, true);
+    } else {
+        hud_box(vp.x + 16, vp.y + vp.h - 16, "HEALTH", hb, NULL, P->health > 30 ? TH_GREEN : TH_RED, false);
+        hud_box(vp.x + 16 + 130, vp.y + vp.h - 16, "ARMOR", ab, NULL, TH_BLUE, false);
+        hud_box(vp.x + vp.w - 16, vp.y + vp.h - 16, "AMMO", mb, sb, TH_ACCENT_HI, true);
+    }
     if (P->msg[0] && in->time - P->msg_time < 3.0) {
         float w = gfx_text_w(FONT_UI, P->msg) + 28;
-        Rect r = rect(vp.x + (vp.w - w) * 0.5f, vp.y + 60, w, 30);
+        Rect r = rect(vp.x + (vp.w - w) * 0.5f, vp.y + (in->touch ? 96 : 60), w, 30);
         gfx_rrect(r, 8, col(10, 11, 13, 210));
         gfx_text_center(FONT_UI, r, P->msg, col_hex(TH_TEXT));
     }
@@ -453,7 +467,8 @@ void play_frame(Rect vp, const Input *in) {
         gfx_text_center(FONT_UI, rect(r.x, r.y + 64, r.w, 24), l, col_hex(TH_TEXT2));
         snprintf(l, sizeof l, "Time %d:%02d", (int)tt / 60, (int)tt % 60);
         gfx_text_center(FONT_MONO, rect(r.x, r.y + 92, r.w, 24), l, col_hex(TH_ACCENT_HI));
-        gfx_text_center(FONT_SMALL, rect(r.x, r.y + 132, r.w, 24), "R  restart    \xC2\xB7    Esc  back to the editor", col_hex(TH_TEXT3));
+        gfx_text_center(FONT_SMALL, rect(r.x, r.y + 132, r.w, 24),
+                        in->touch ? "Tap to play again \xC2\xB7 pause button returns to the editor" : "R  restart    \xC2\xB7    Esc  back to the editor", col_hex(TH_TEXT3));
     }
     gfx_clip_pop();
 }

@@ -17,6 +17,14 @@ enum { CUR_ARROW, CUR_HAND, CUR_CROSS, CUR_IBEAM, CUR_MOVE, CUR_SIZEWE, CUR_SIZE
 enum { WINMODE_SPLASH, WINMODE_MAIN };
 
 typedef struct {
+    int id;
+    float x, y;          /* logical px */
+    float sx, sy;        /* where it went down */
+    double t0;           /* when it went down */
+    bool pressed, released;
+} TouchPt;
+
+typedef struct {
     float mx, my;       /* mouse in logical pixels */
     float mdx, mdy;     /* raw mouse delta (device units) */
     bool mdown[3], mpressed[3], mreleased[3], mdouble[3];
@@ -29,6 +37,18 @@ typedef struct {
     float scale;        /* dpi scale */
     double time, dt;
     bool focused, maximized;
+    /* touch screens (Android). The mobile shell turns raw touches into the mouse
+       fields above plus these virtual controls before the editor sees them. */
+    bool touch;                 /* no hover; 3D picking only on taps */
+    float vmove_x, vmove_y;     /* virtual stick: right / forward, -1..1 */
+    float vlift;                /* fly up / down, -1..1 */
+    float vlook_x, vlook_y;     /* look drag this frame, logical px */
+    bool vfire, vcrouch;        /* held */
+    bool vjump, vuse;           /* pressed this frame */
+    int ntouch;
+    TouchPt touches[10];
+    float inset_l, inset_t, inset_r, inset_b; /* safe area (cutouts, gesture bar), logical px */
+    bool back;                  /* system back gesture / button */
 } Input;
 
 typedef struct { uint32_t cp; int x, y, w, h; float xoff, yoff, adv; } GlyphInfo;
@@ -76,11 +96,24 @@ uint8_t *plat_load_image(const char *path, int *w, int *h);
 bool plat_font_raster(const char *face, float px, int weight, const uint32_t *cps, int ncp, FontRaster *out);
 void plat_set_app_icon(const uint8_t *rgba, int w, int h);
 
+/* mobile (Android); desktop builds provide no-op stubs */
+enum { ORIENT_PORTRAIT, ORIENT_LANDSCAPE, ORIENT_ANY };
+enum { HAPTIC_TICK, HAPTIC_CONFIRM, HAPTIC_LONG };
+enum { TEXTIN_NAME, TEXTIN_NUMBER };
+void plat_set_orientation(int o);
+void plat_haptic(int kind);
+bool plat_text_input_begin(int req, const char *title, const char *initial, int kind); /* async system dialog */
+bool plat_text_input_poll(int *req, char *out, size_t cap);                           /* true once when finished (OK) */
+bool plat_pick_image_begin(void);                                                     /* async gallery picker */
+bool plat_pick_image_poll(char *path, size_t cap);                                    /* true once with a readable copy */
+void plat_open_url(const char *url);
+
 /* implemented by the app */
 bool app_init(void);
 void app_frame(const Input *in);
 bool app_on_close(void);
 int app_hit_test(float x, float y); /* 0 = client, 1 = caption */
 void app_shutdown(void);
+void app_suspend(void);    /* mobile: going to the background, save now */
 
 #endif

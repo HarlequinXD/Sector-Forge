@@ -149,10 +149,18 @@ int ed_sel_sector_count(void);
 void ed2d_frame(Rect vp, const Input *in);
 D2 ed2d_world_to_screen(double x, double y);
 D2 ed2d_screen_to_world(float sx, float sy);
+/* touch shell hooks */
+void ed2d_finish_draw(bool closed);
+bool ed2d_item_at(float sx, float sy);
+void ed2d_select_at(float sx, float sy);
+void ed2d_zoom_about(float sx, float sy, double factor);
+void ed2d_pan_px(float dx, float dy);
+void ed2d_render_view(Rect vp, const Input *in, double cx, double cy, double zoom);
 
 /* 3D (ed3d.c) */
 void ed3d_frame(Rect vp, const Input *in);
 void ed3d_sync_camera_from_2d(void);
+void ed3d_adjust(float dir, bool fine);   /* the mouse wheel / touch height dial */
 void ed3d_texture_applied(const char *name);
 const char *ed3d_surface_texture(uint32_t id);
 

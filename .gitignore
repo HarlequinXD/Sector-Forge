@@ -5,3 +5,9 @@ out/
 *.user
 *.zip
 /test_map
+android/.gradle/
+android/app/build/
+android/app/.cxx/
+android/build/
+android/local.properties
+android/build.log
