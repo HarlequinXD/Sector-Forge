@@ -21,10 +21,22 @@ jobs:
         run: echo "::add-matcher::.github/msvc-matcher.json"
 
       - name: Configure
-        run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+        shell: pwsh
+        run: |
+          cmake -S . -B build -A x64 2>&1 | Tee-Object -FilePath configure.log
+          if ($LASTEXITCODE -ne 0) {
+            Get-Content configure.log | Select-Object -Last 40 | ForEach-Object { Write-Output "::error title=configure::$_" }
+            exit 1
+          }
 
       - name: Build
-        run: cmake --build build --config Release -- /m /nologo /v:minimal
+        shell: pwsh
+        run: |
+          cmake --build build --config Release -- /m /nologo /v:minimal 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            Select-String -Path build.log -Pattern ': (fatal )?error ' | Select-Object -First 40 | ForEach-Object { Write-Output "::error title=build::$($_.Line)" }
+            exit 1
+          }
 
       - name: Package
         shell: pwsh
