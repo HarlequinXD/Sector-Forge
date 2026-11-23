@@ -4,7 +4,7 @@ project(SectorForge VERSION 0.1.0 LANGUAGES C RC)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 # standard dynamic C runtime (vcruntime140.dll ships next to the exe)
-set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreadedDLL$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
 
 set(SOURCES
     src/base.c src/map.c src/mapio.c src/texgen.c src/icons.c src/gfx.c src/ui.c
