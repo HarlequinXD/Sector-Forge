@@ -1,0 +1,18 @@
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files:
+SectorForge
+
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files/SectorForge:
+Projects
+
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects:
+Smoke Test
+
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects/Smoke Test:
+maps
+project.sfproj
+textures
+
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects/Smoke Test/maps:
+map01.sfmap
+
+/storage/emulated/0/Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects/Smoke Test/textures:
