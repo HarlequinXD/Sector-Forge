@@ -144,6 +144,30 @@ jobs:
           git -c user.name=ci -c user.email=ci@localhost commit -q -m "Emulator smoke test ${{ github.sha }}"
           git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-shots
 
+  latest:
+    name: Publish the "latest" release
+    if: github.ref == 'refs/heads/main'
+    needs: [ windows, android, android-smoke ]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: SectorForge-android
+      - uses: actions/download-artifact@v4
+        with:
+          name: SectorForge-windows-x64
+          path: win
+      - name: Replace the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          (cd win && zip -qr ../SectorForge-windows-x64.zip .)
+          gh release delete latest --cleanup-tag --yes || true
+          gh release create latest SectorForge-android.apk SectorForge-windows-x64.zip \
+            --target "${{ github.sha }}" --title "Latest build (${GITHUB_SHA::7})" \
+            --notes "Built automatically from main. **Android:** download SectorForge-android.apk on your phone and open it to install. **Windows:** unzip SectorForge-windows-x64.zip and run SectorForge.exe."
+
   mobile-tests:
     name: Touch shell tests (Linux, Mesa GLES)
     runs-on: ubuntu-latest
