@@ -72,7 +72,7 @@ void play_start(bool from_camera) {
     ed.play_return = ed.mode;
     ed.mode = MODE_PLAY;
     plat_set_relative_mouse(true);
-    if (!P->msg[0]) play_msg("Play mode \xE2\x80\x94 Esc returns to the editor");
+    if (!P->msg[0]) play_msg(ed.touch_ui ? "Play mode \xE2\x80\x94 the pause button returns to the editor" : "Play mode \xE2\x80\x94 Esc returns to the editor");
 }
 
 void play_stop(void) {

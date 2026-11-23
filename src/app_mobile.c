@@ -986,7 +986,7 @@ static const GuideItem g_guide[3][9] = {
 };
 
 static float guide_cards(Rect area, int tab, int cols, float y) {
-    float gw = (area.w - (cols - 1) * 12) / cols, gh = 84;
+    float gw = (area.w - (cols - 1) * 12) / cols, gh = 96;
     for (int i = 0; i < 9; i++) {
         const GuideItem *g = &g_guide[tab][i];
         Rect c = rect(area.x + (i % cols) * (gw + 12), y + (i / cols) * (gh + 12), gw, gh);
@@ -995,18 +995,22 @@ static float guide_cards(Rect area, int tab, int cols, float y) {
         Rect ic = rect(c.x + 14, c.y + 16, 44, 44);
         gfx_rrect(ic, 12, C(MS_ACC_CT));
         gfx_icon(g->icon, ic.x + 22, ic.y + 22, 22, C(MS_ACC_ON));
-        gfx_text_fit(FONT_UI_BOLD, c.x + 72, c.y + 16, c.w - 84, g->title, C(MS_ON));
-        /* two-line wrap */
+        gfx_text_fit(FONT_UI_BOLD, c.x + 72, c.y + 14, c.w - 84, g->title, C(MS_ON));
+        /* word wrap, up to three lines */
         const char *b = g->body;
-        float maxw = c.w - 84;
-        int cut = (int)strlen(b);
-        if (gfx_text_w(FONT_SMALL, b) > maxw) {
-            int best = 0;
-            for (int k = 0; b[k]; k++) if (b[k] == ' ' && gfx_text_wn(FONT_SMALL, b, k) <= maxw) best = k;
-            cut = best ? best : cut;
+        float maxw = c.w - 84, ly = c.y + 38;
+        for (int line = 0; line < 3 && *b; line++) {
+            int n = (int)strlen(b), cut = n;
+            if (gfx_text_w(FONT_SMALL, b) > maxw) {
+                int best = 0;
+                for (int k = 0; b[k]; k++) if (b[k] == ' ' && gfx_text_wn(FONT_SMALL, b, k) <= maxw) best = k;
+                cut = best ? best : n;
+            }
+            if (line == 2 || cut == n) { gfx_text_fit(FONT_SMALL, c.x + 72, ly, maxw, b, C(MS_ON2)); break; }
+            gfx_text_n(FONT_SMALL, c.x + 72, ly, b, cut, C(MS_ON2));
+            b += cut + 1;
+            ly += 18;
         }
-        gfx_text_n(FONT_SMALL, c.x + 72, c.y + 40, b, cut, C(MS_ON2));
-        if (b[cut]) gfx_text_fit(FONT_SMALL, c.x + 72, c.y + 58, maxw, b + cut + 1, C(MS_ON2));
     }
     return y + ((9 + cols - 1) / cols) * (gh + 12);
 }
@@ -2340,6 +2344,10 @@ static void overlays_2d(Rect vp, const Input *in) {
         if (rect2) bw = 136;
         Rect bar = rect(cx - bw * 0.5f, vp.y + vp.h - 70 - in->inset_b, bw, 62);
         if (bar.x < sm.x + sm.w + 8) bar.x = sm.x + sm.w + 8;
+        if (bar.x + bar.w > vp.x + vp.w - 8) {   /* not enough room beside the mode pill: go above it */
+            bar.x = SF_MAX(vp.x + 8, SF_MIN(cx - bw * 0.5f, vp.x + vp.w - 8 - bw));
+            bar.y = sm.y - 70;
+        }
         region(bar);
         gfx_shadow(bar, 31, 14, col(0, 0, 0, 140));
         gfx_rrect(bar, 31, CA(0x1B1D22, 248));
@@ -2784,6 +2792,7 @@ bool app_init(void) {
     map_init(&ed.map);
     map_init(&ed.clip);
     M.haptics = true;
+    ed.touch_ui = true;
     M.proj_sel = -1;
     char flag[600], ad[512];
     plat_appdata_dir(ad, sizeof ad);

@@ -108,6 +108,7 @@ typedef struct Editor {
     double toast_time;
     int toast_kind;
     float fps;
+    bool touch_ui;   /* running the touch shell (Android) */
 } Editor;
 
 extern Editor ed;
