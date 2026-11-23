@@ -14,7 +14,7 @@
 #include <string.h>
 #include <math.h>
 
-#define SF_VERSION "0.1.0"
+#define SF_VERSION "0.2.0"
 #define SF_PI 3.14159265358979323846
 #define SF_DEG2RAD (SF_PI / 180.0)
 
