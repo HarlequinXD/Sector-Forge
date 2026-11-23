@@ -105,6 +105,44 @@ jobs:
         with:
           files: SectorForge-android.apk
 
+  android-smoke:
+    name: Android emulator smoke test
+    needs: android
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: SectorForge-android
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: true
+          script: sh .github/android-smoke.sh
+      - name: Report
+        run: |
+          echo "::notice title=pid::$(cat shots/pid.txt)"
+          grep -E "FATAL|AndroidRuntime: |signal [0-9]+|Abort" shots/logcat.txt | head -n 20 | while IFS= read -r l; do echo "::warning title=logcat::$l"; done
+          grep -E "SectorForge" shots/logcat.txt | head -n 10 | while IFS= read -r l; do echo "::notice title=log::$l"; done
+      - name: Publish screenshots to the ci-shots branch
+        if: github.ref == 'refs/heads/main'
+        run: |
+          cd shots
+          git init -q
+          git checkout -q -b ci-shots
+          git add .
+          git -c user.name=ci -c user.email=ci@localhost commit -q -m "Emulator smoke test ${{ github.sha }}"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" ci-shots
+
   mobile-tests:
     name: Touch shell tests (Linux, Mesa GLES)
     runs-on: ubuntu-latest
