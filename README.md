@@ -1,6 +1,6 @@
 # Sector Forge
 
-**A Doom-style sector map editor and game engine for Windows.** Build maps in 2D, texture and shape them in a live 3D view, and play them instantly. It is written in C11 on Win32 and OpenGL, with no outside dependencies.
+**A Doom-style sector map editor and game engine for Windows and Android.** Build maps in 2D, texture and shape them in a live 3D view, and play them instantly. It is written in C11 on Win32/OpenGL and Android/OpenGL ES, with no outside dependencies beyond the public-domain stb headers.
 
 ![2D map editor](docs/editor-2d.png)
 
@@ -20,6 +20,19 @@
 * **Releases:** pushing a `v*` tag publishes a zip on the Releases page.
 
 Requirements: Windows 10 or 11 (64-bit) and any GPU driver with OpenGL 1.1 or newer, which means every Windows PC.
+
+### Android
+* **Latest build:** in the newest green **Build** run on the [Actions](../../actions) tab, download **SectorForge-android** and install `SectorForge-android.apk` (allow installs from your browser or file manager when asked). Tagged releases attach the APK as well.
+* Android 8.0 or newer with OpenGL ES 3.0 (any phone from the last several years). Built for arm64 phones plus x86_64 emulators.
+* Every build is signed with the same key (`android/sectorforge-release.jks`), so a new APK installs over the old one and keeps your projects. That key is public; use your own before publishing to a store.
+* Projects live in `Android/data/com.harlequinxd.sectorforge/files/SectorForge/Projects`, which you can reach over USB. The `.sfproj` / `.sfmap` files are the same as on Windows, so projects move between the two.
+
+The phone version has its own touch-first interface rather than a shrunk desktop one:
+* **Home (portrait):** template carousel, recent projects with map thumbnails (long-press for duplicate / delete), a *New project* button and tabs for templates, the touch-controls guide and settings.
+* **Editor (landscape):** a tool rail in thumb reach, a 2D / 3D / Play switch, undo / redo / save, grid / snap / zoom chips and a side sheet with Properties, Textures, Things and Map tabs. Steppers are large, and tapping a value opens the number keyboard.
+* **2D:** tap to place points with a magnifier loupe above your finger, then *Close shape* or double-tap. Drag moves, dragging empty space box-selects, two fingers pan and pinch-zoom, long-press opens the action sheet. A three-finger tap undoes, and a two-finger double-tap steps the grid size.
+* **3D:** drag to look, use the joystick and up/down buttons to fly, and tap a surface to select it. The **height dial** raises and lowers floors and ceilings in steps of 1/4/8/16/32. A recent-textures strip applies a texture in one tap, and you can import textures from the gallery.
+* **Play:** floating move stick, drag to look, plus Fire / Use / Jump / Crouch buttons and a pause menu. Bluetooth gamepads, keyboards and Samsung DeX mice also work.
 
 ## Features
 
@@ -108,6 +121,12 @@ cmake --build build --config Release
 ```
 This produces `build/Release/SectorForge.exe`. MinGW-w64 also works (`cmake -G "MinGW Makefiles"`).
 
+Android (SDK with NDK and CMake, Gradle 8.9+, JDK 17):
+```
+cd android
+gradle assembleRelease      # -> app/build/outputs/apk/release/app-release.apk
+```
+
 ## Source layout
 | File | Purpose |
 | --- | --- |
@@ -118,9 +137,16 @@ This produces `build/Release/SectorForge.exe`. MinGW-w64 also works (`cmake -G "
 | `src/ui.c`, `gfx.c` | Immediate-mode UI toolkit and 2D drawing layer |
 | `src/texgen.c`, `icons.c`, `assets.c` | Procedural textures and sprites, vector icon rasteriser, asset library |
 | `src/win32.c` | Win32 platform layer: borderless window, WGL with MSAA, raw input, GDI fonts, WIC images, shell file operations |
+| `src/app_mobile.c` | Android touch shell: home screens, landscape editor chrome, gesture routing (touch to mouse, sticks, pinch, loupe, height dial) |
+| `src/android.c`, `android/` | NativeActivity platform layer (EGL, multi-touch, gamepad, DeX mouse) and the Gradle project with `MainActivity.java` |
+| `src/gles_compat.c` | The GL 1.1 subset the renderer uses, emulated on OpenGL ES 3 (batched immediate mode, matrix stacks, fog, alpha test) |
+| `src/tess.c` | Odd-winding polygon triangulator with holes; replaces GLU on Android |
+| `src/plat_posix.c`, `font_stb.c` | POSIX file operations, plus stb_truetype fonts and stb_image decoding for non-Windows builds |
 
 ## Tests
 * `tests/test_map.c`: unit tests for the map core. They run on Linux in CI under AddressSanitizer.
+* `tests/run_mobile.sh`: runs the Android touch shell headlessly on Linux on real OpenGL ES (Mesa) with scripted multi-touch. It covers drawing with the loupe, pinch, long-press actions, the height dial, joystick, play controls and the project sheet, and writes screenshots to `/tmp/mshots`.
+* CI also boots an Android emulator, installs the APK and walks through the app.
 * `tests/run_harness.sh`: a headless harness that drives the **whole app** with scripted mouse and keyboard input under ASan/UBSan, using a software OpenGL stand-in. It covers creating a project, drawing sectors, the 3D wheel, play mode, maps, dialogs and reopening. Set `SF_SHOTS=1` to dump screenshots.
 
 ## "Trojan:Win32/Wacatac" warnings

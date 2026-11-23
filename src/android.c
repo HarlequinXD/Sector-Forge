@@ -449,10 +449,10 @@ void android_main(struct android_app *app) {
             if (id == ALOOPER_POLL_TIMEOUT || id == ALOOPER_POLL_ERROR) break;
             if (id >= 0 && src) src->process(app, src);
             if (app->destroyRequested) {
+                /* The activity can be recreated inside this same process (the .so stays loaded and
+                   android_main runs again). Keep the EGL context, and with it every texture and the
+                   editor state, so a relaunch simply continues where it was. */
                 egl_drop_surface();
-                if (g_ctx != EGL_NO_CONTEXT) eglDestroyContext(g_dpy, g_ctx);
-                if (g_dpy != EGL_NO_DISPLAY) eglTerminate(g_dpy);
-                g_ctx = EGL_NO_CONTEXT; g_dpy = EGL_NO_DISPLAY;
                 return;
             }
             timeout = (g_app_ready && g_surf != EGL_NO_SURFACE && !g_paused) ? 0 : -1;
