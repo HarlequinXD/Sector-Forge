@@ -6,12 +6,16 @@
 #ifndef _UNICODE
 #define _UNICODE
 #endif
+#ifndef _WIN32_WINNT
+#define _WIN32_WINNT 0x0A00
+#endif
 #include "glinc.h"
 #include <windowsx.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <commdlg.h>
 #include <wincodec.h>
+#include <dwmapi.h>
 #include "plat.h"
 
 /* ------------------------------------------------------------------ state */
@@ -130,8 +134,8 @@ static bool shell_op(UINT func, const char *from, const char *to, FILEOP_FLAGS f
     return SHFileOperationW(&op) == 0 && !op.fAnyOperationsAborted;
 }
 
-bool plat_recycle(const char *path) { return shell_op(FO_DELETE, path, NULL, FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_SILENT | FOF_NOERRORUI); }
-bool plat_copy_dir(const char *src, const char *dst) { return shell_op(FO_COPY, src, dst, FOF_NOCONFIRMATION | FOF_NOCONFIRMMKDIR | FOF_SILENT | FOF_NOERRORUI); }
+bool plat_recycle(const char *path) { return shell_op(FO_DELETE, path, NULL, FOF_ALLOWUNDO | FOF_NOCONFIRMATION); }
+bool plat_copy_dir(const char *src, const char *dst) { return shell_op(FO_COPY, src, dst, FOF_NOCONFIRMMKDIR); }
 
 bool plat_copy_file(const char *src, const char *dst) {
     wchar_t a[1024], b[1024];
@@ -366,15 +370,8 @@ void plat_set_app_icon(const uint8_t *rgba, int w, int h) {
 
 /* ------------------------------------------------------------------ window control */
 static float dpi_of(HWND h) {
-    typedef UINT(WINAPI * PFN)(HWND);
-    static PFN p = NULL;
-    static bool tried = false;
-    if (!tried) { tried = true; p = (PFN)(void *)GetProcAddress(GetModuleHandleW(L"user32.dll"), "GetDpiForWindow"); }
-    if (p && h) return p(h) / 96.0f;
-    HDC dc = GetDC(NULL);
-    float s = GetDeviceCaps(dc, LOGPIXELSX) / 96.0f;
-    ReleaseDC(NULL, dc);
-    return s;
+    UINT d = h ? GetDpiForWindow(h) : 0;
+    return d ? d / 96.0f : 1.0f;
 }
 
 static void center_window(int w, int h) {
@@ -661,39 +658,21 @@ static LRESULT CALLBACK wndproc(HWND h, UINT msg, WPARAM wp, LPARAM lp) {
     return DefWindowProcW(h, msg, wp, lp);
 }
 
-static void set_dpi_awareness(void) {
-    typedef BOOL(WINAPI * PFN_CTX)(HANDLE);
-    HMODULE u = GetModuleHandleW(L"user32.dll");
-    PFN_CTX p = (PFN_CTX)(void *)GetProcAddress(u, "SetProcessDpiAwarenessContext");
-    if (p && p((HANDLE)(intptr_t)-4)) return; /* PER_MONITOR_AWARE_V2 */
-    typedef BOOL(WINAPI * PFN_AW)(void);
-    PFN_AW q = (PFN_AW)(void *)GetProcAddress(u, "SetProcessDPIAware");
-    if (q) q();
-}
-
+/* DPI awareness (per-monitor v2) comes from the embedded application manifest. */
 static void dwm_setup(void) {
-    HMODULE d = LoadLibraryW(L"dwmapi.dll");
-    if (!d) return;
-    typedef HRESULT(WINAPI * PFN_EXT)(HWND, const void *);
-    typedef HRESULT(WINAPI * PFN_ATTR)(HWND, DWORD, LPCVOID, DWORD);
-    PFN_EXT ext = (PFN_EXT)(void *)GetProcAddress(d, "DwmExtendFrameIntoClientArea");
-    PFN_ATTR attr = (PFN_ATTR)(void *)GetProcAddress(d, "DwmSetWindowAttribute");
-    struct { int l, r, t, b; } margins = { 1, 1, 1, 1 };
-    if (ext) ext(g_hwnd, &margins);
-    if (attr) {
-        int corner = 2; /* DWMWCP_ROUND (Windows 11) */
-        attr(g_hwnd, 33, &corner, sizeof corner);
-        BOOL dark = TRUE;
-        attr(g_hwnd, 20, &dark, sizeof dark); /* immersive dark mode */
-        COLORREF border = RGB(0x2B, 0x2F, 0x37);
-        attr(g_hwnd, 34, &border, sizeof border);
-    }
+    MARGINS margins = { 1, 1, 1, 1 };
+    DwmExtendFrameIntoClientArea(g_hwnd, &margins);
+    DWORD corner = 2; /* DWMWCP_ROUND (Windows 11, ignored elsewhere) */
+    DwmSetWindowAttribute(g_hwnd, 33, &corner, sizeof corner);
+    BOOL dark = TRUE;
+    DwmSetWindowAttribute(g_hwnd, 20, &dark, sizeof dark); /* immersive dark mode */
+    COLORREF border = RGB(0x2B, 0x2F, 0x37);
+    DwmSetWindowAttribute(g_hwnd, 34, &border, sizeof border);
 }
 
 int WINAPI wWinMain(HINSTANCE inst, HINSTANCE prev, PWSTR cmd, int show) {
     (void)prev; (void)cmd; (void)show;
     g_inst = inst;
-    set_dpi_awareness();
     CoInitializeEx(NULL, COINIT_APARTMENTTHREADED);
     QueryPerformanceFrequency(&g_freq);
     QueryPerformanceCounter(&g_t0);

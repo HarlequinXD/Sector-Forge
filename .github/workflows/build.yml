@@ -43,6 +43,8 @@ jobs:
         run: |
           New-Item -ItemType Directory -Force dist | Out-Null
           Copy-Item build/Release/SectorForge.exe dist/
+          # app-local VC runtime so it runs without installing the redistributable
+          Copy-Item "$env:SystemRoot\System32\vcruntime140.dll" dist/
           Copy-Item README.md dist/
           Compress-Archive -Path dist/* -DestinationPath SectorForge-windows-x64.zip -Force
 

@@ -16,7 +16,7 @@
 
 ## Download
 
-* **Latest build:** open the [Actions](../../actions) tab, pick the newest green **Build** run and download **SectorForge-windows-x64**. It contains one portable `SectorForge.exe` with no installer and no DLLs.
+* **Latest build:** open the [Actions](../../actions) tab, pick the newest green **Build** run and download **SectorForge-windows-x64**. It contains `SectorForge.exe` plus `vcruntime140.dll`; keep them in the same folder. No installer needed.
 * **Releases:** pushing a `v*` tag publishes a zip on the Releases page.
 
 Requirements: Windows 10 or 11 (64-bit) and any GPU driver with OpenGL 1.1 or newer, which means every Windows PC.
@@ -122,3 +122,6 @@ This produces `build/Release/SectorForge.exe`. MinGW-w64 also works (`cmake -G "
 ## Tests
 * `tests/test_map.c`: unit tests for the map core. They run on Linux in CI under AddressSanitizer.
 * `tests/run_harness.sh`: a headless harness that drives the **whole app** with scripted mouse and keyboard input under ASan/UBSan, using a software OpenGL stand-in. It covers creating a project, drawing sectors, the 3D wheel, play mode, maps, dialogs and reopening. Set `SF_SHOTS=1` to dump screenshots.
+
+## "Trojan:Win32/Wacatac" warnings
+New, unsigned hobby builds are sometimes flagged by Defender's machine-learning heuristics (names ending in `!ml`). Sector Forge is built from this repository's source by GitHub Actions. If it is flagged, restore it from **Windows Security → Protection history → Allow on device**, and report it at <https://www.microsoft.com/wdsi/filesubmission> as "Incorrectly detected as malware". Signing releases with a code-signing certificate removes these warnings for good.
